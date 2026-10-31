@@ -40,6 +40,8 @@
     { id: '5', name: 'Every 5 minutes', min: 5 }, { id: '15', name: 'Every 15 minutes', min: 15 },
     { id: '60', name: 'Every hour', min: 60 }
   ];
+  var UNSPLASH_WORDS = (window.CleanFrameUnsplash || {}).keywords || ['Spring'], REMOTE = 'unsplash:', UNSPLASH_RETRY_MIN = 15, remoteWalls = {};
+  var FREQUENCIES = [{ id: 'hourly', name: 'Every hour', min: 60 }, { id: 'daily', name: 'Every day', min: 1440 }, { id: 'weekly', name: 'Every week', min: 10080 }];
   var KEY = 'cleanframe.home.v1', storageOk = true, catalog = { loading: false, loaded: false, error: null, request: 0, revision: 0 };
   var QA = window.ShoreQA = { minuteMs: window.ShoreQA && window.ShoreQA.minuteMs || 60000 };
   var FONTS = {
@@ -53,7 +55,7 @@
   var PRIVATE_FONTS = window.CleanFramePrivateFontIDs || [], fontMetrics = {}, unavailableFonts = {}, widthCache = {}, fontRevision = 0, fontsReady = false;
   var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] };
   var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material' };
-  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
+  var VALUE_NAMES = { gallery: 'Built-in', unsplash: 'Unsplash', dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
   var UTIL = { art: ['Art Mode', 'art'], apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
   var MSG = {
     leave: { title: 'Leave Home?', line: 'Open Samsung Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'Samsung Home']] }
@@ -83,7 +85,7 @@
     sel: null, selIdx: 0, lastUtil: 0, appsFocus: null, settingsFocus: 'background', appearanceFocus: 'bg', detailFocus: {},
     undo: [], removedAt: {}, note: null, err: null,
     writes: 0, failed: 0, log: [], logN: 0, lastLaunch: null, press: null,
-    wallShown: null, wallPending: null, wallError: null,
+    wallShown: null, wallPending: null, wallError: null, unsplashBusy: false,
     shown: null, pending: null, lookError: null, bundleKey: null, previewBundle: null, reflow: false, fontSwitch: false
   };
   var scroll = { first: 0, off: 0, photo: 0, photoArrange: 0 };
@@ -97,7 +99,19 @@
 
   /* ---------- Helpers ---------- */
   function app(id) { for (var i = 0; i < APPS.length; i++) if (APPS[i].id === id) return APPS[i]; return null; }
-  function wall(id) { for (var i = 0; i < WALLS.length; i++) if (WALLS[i].id === id) return WALLS[i]; return null; }
+  function wall(id) {
+    for (var i = 0; i < WALLS.length; i++) if (WALLS[i].id === id) return WALLS[i];
+    return remoteWalls.hasOwnProperty(id) ? remoteWalls[id] : null;
+  }
+  /* A downloaded photo has no offline ink review, so it always takes the dimmed, light-ink treatment. */
+  function addRemoteWall(photo) {
+    var id = REMOTE + photo.id;
+    remoteWalls[id] = { id: id, name: 'Unsplash: ' + photo.keyword, tone: 'light', ut: { tr: 'mist', br: 'mist' }, frostVeil: .30, listColumn: 3, dockQuiet: false, clockMist: true, photo: photo };
+    return id;
+  }
+  function galleryWall(id) { var w = wall(id); return !!w && !w.photo; }
+  function wallThumb(id) { var w = wall(id); return w && w.photo ? FrameUnsplash.src(w.photo, 'thumb') : WP + id + '-thumb.jpg'; }
+  function frequency() { for (var i = 0; i < FREQUENCIES.length; i++) if (FREQUENCIES[i].id === S.c.frequency) return FREQUENCIES[i]; return FREQUENCIES[1]; }
   function wallIndex(id) { for (var i = 0; i < WALLS.length; i++) if (WALLS[i].id === id) return i; return 0; }
   function frostClass(w) { var i = [.12, .20, .30, .36, .44].indexOf(w.frostVeil); return i > 0 ? ' fv-' + (i + 1) : ''; }
   function wallClasses(w) { return frostClass(w) + (w.listColumn ? ' lc-' + w.listColumn : '') + (w.dockQuiet ? ' db-quiet' : '') + (w.clockMist ? ' tl-mist' : ''); }
@@ -336,6 +350,8 @@
   function clean(saved) {
     var s = saved && typeof saved === 'object' ? saved : {}, modern = s.look && typeof s.look === 'object' ? s.look : s;
     var legacyList = s.theme === 'list', h = [], recent = [], records = Array.isArray(s.appRecords) ? s.appRecords : [];
+    var savedWall = modern.wall || s.wallpaper, gallery = galleryWall(savedWall) && s.source !== 'unsplash' ? savedWall : galleryWall(s.gallery) ? s.gallery : galleryWall(savedWall) ? savedWall : WALLS[0].id;
+    var photo = FrameUnsplash.valid(s.photo) && typeof s.photo.keyword === 'string' && typeof s.photo.fetchedAt === 'number' ? s.photo : null, useUnsplash = s.source === 'unsplash' && !!photo;
     records.slice(0, 256).forEach(function (a) {
       if (!a || !safeId(a.id) || !safeId(a.appId) || typeof a.name !== 'string' || !a.name.trim() || app(a.id)) return;
       APPS.push({ id: a.id, appId: a.appId, name: a.name.slice(0, 160), brand: ['hbomax', 'spotify', 'tubi'].indexOf(a.brand) >= 0 ? a.brand : '', mark: ['hbomax', 'spotify', 'tubi'].indexOf(a.brand) >= 0, icon: LETTER_ONLY.indexOf(a.appId) >= 0 ? '' : safeIcon(a.icon) });
@@ -354,9 +370,12 @@
       bg: pick(modern.bg, LOOK_VALUES.bg, legacyList ? 'dark' : 'photo'), layout: pick(modern.layout, LOOK_VALUES.layout, legacyList ? 'list' : 'dock'),
       apps: pick(modern.apps, LOOK_VALUES.apps, legacyList ? 'text' : 'both'), controls: pick(modern.controls, LOOK_VALUES.controls, 'both'),
       focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'),
-      font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
+      font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: useUnsplash ? addRemoteWall(photo) : gallery,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
-      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed')
+      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
+      source: useUnsplash ? 'unsplash' : 'gallery', gallery: gallery, photo: photo,
+      keyword: UNSPLASH_WORDS.indexOf(s.keyword) >= 0 ? s.keyword : UNSPLASH_WORDS[0],
+      frequency: pick(s.frequency, FREQUENCIES.map(function (f) { return f.id; }), 'daily')
     };
   }
   function serialise(c) {
@@ -375,13 +394,13 @@
     var saved = load(), initial; S.c = clean(saved); initial = next(S.c.home.slice(), S.c.recent.slice());
     S.stack = [{ id: 'home', f: { zone: 'apps', u: 0 } }];
     S.sel = S.c.lastApp; S.selIdx = S.c.home.indexOf(S.sel);
-    if (saved && initial.mode === 'open') initial.wall = WALLS[(wallIndex(initial.wall) + 1) % WALLS.length].id;
+    if (saved && initial.mode === 'open' && initial.source === 'gallery') initial.wall = WALLS[(wallIndex(initial.wall) + 1) % WALLS.length].id;
     // Keep the old schema keys alongside the builder values for in-place updates.
     try { localStorage.setItem(KEY, JSON.stringify(serialise(initial))); S.c = initial; storageOk = true; } catch (e) { storageOk = false; }
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }
-  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; return c; }
+  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; c.source = S.c.source; c.gallery = S.c.gallery; c.photo = S.c.photo; c.keyword = S.c.keyword; c.frequency = S.c.frequency; return c; }
   function snap() { return { home: S.c.home.slice(), recent: S.c.recent.slice() }; }
   function pushRecent(list, id) { return [id].concat(without(list, id)).slice(0, 5); }
   function write(c, label) {
@@ -516,7 +535,7 @@
   function openSettings() { push({ id: 'settings', f: { id: S.settingsFocus } }); }
   function openAppearance(group) {
     var axis = { background: 'bg', layout: 'layout', typography: 'font', focus: 'focus' }[group];
-    var action = S.detailFocus[group] || (axis ? 'choice.' + axis + '.' + S.c[axis] : group === 'rotation' ? 'rotation.' + S.c.mode : 'samsung.home');
+    var action = S.detailFocus[group] || (axis ? 'choice.' + axis + '.' + S.c[axis] : group === 'rotation' ? 'rotation.' + S.c.mode : group === 'unsplash' || group === 'keyword' || group === 'frequency' ? '' : 'samsung.home');
     push({ id: 'appearance', group: group, f: { action: action } });
   }
   function openMessage(key) { push({ id: 'message', msg: key, f: { b: 0 } }); }
@@ -851,19 +870,31 @@
     if (id === 'editor') openEditor('settings');
     else openAppearance(id);
   }
-  var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'Samsung' };
+  var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', unsplash: 'Unsplash', keyword: 'Keyword', frequency: 'Update frequency', samsung: 'Samsung' };
+  function detailParent(t) { return t.group === 'keyword' || t.group === 'frequency' ? 'Unsplash' : t.group === 'rotation' || t.group === 'unsplash' ? 'Background' : 'Settings'; }
   function choice(axis, value, disabled) {
-    return { action: axis === 'mode' ? 'rotation.' + value : 'choice.' + axis + '.' + value, axis: axis, value: value, disabled: !!disabled,
-      label: axis === 'font' ? FONTS[value].name : axis === 'mode' ? MODES.filter(function (m) { return m.id === value; })[0].name : value === 'both' ? 'Both' : VALUE_NAMES[value] };
+    return { action: axis === 'mode' ? 'rotation.' + value : axis === 'keyword' ? 'choice.keyword.' + UNSPLASH_WORDS.indexOf(value) : 'choice.' + axis + '.' + value, axis: axis, value: value, disabled: !!disabled,
+      label: axis === 'font' ? FONTS[value].name : axis === 'mode' ? MODES.filter(function (m) { return m.id === value; })[0].name : axis === 'keyword' ? value : axis === 'frequency' ? FREQUENCIES.filter(function (f) { return f.id === value; })[0].name : value === 'both' ? 'Both' : VALUE_NAMES[value] };
   }
   function detailSections(t) {
-    var flat = S.c.bg !== 'photo', inactive = !materialApplies();
+    var flat = S.c.bg !== 'photo', inactive = !materialApplies(), photo = S.c.photo;
     function options(axis, values, disabled) { return values.map(function (value) { return choice(axis, value, disabled); }); }
     if (t.group === 'background') return [
       { id: 'bg', title: 'Background type', items: options('bg', ['photo', 'light', 'dark']) },
+      { id: 'source', title: 'Image source', horizontal: true, items: options('source', ['gallery', 'unsplash'], flat) }
+    ].concat(S.c.source === 'unsplash' ? [
+      { id: 'unsplash', title: 'Unsplash', items: [{ action: 'background.unsplash', label: S.c.keyword + ', ' + frequency().name.toLowerCase(), disabled: flat }], reason: flat ? 'Choose Photo to use Unsplash.' : '' }
+    ] : [
       { id: 'wall', title: 'Wallpaper', items: [{ action: 'background.wallpaper', label: wall(S.c.wall).name, thumbnail: true, disabled: flat }] },
       { id: 'rotation', title: 'Rotation', items: [{ action: 'background.rotation', label: mode().name, disabled: flat }], reason: flat ? 'Choose Photo to use wallpaper and rotation.' : '' }
+    ]);
+    if (t.group === 'unsplash') return [
+      { id: 'keywordRow', title: 'Keyword', items: [{ action: 'background.keyword', label: S.c.keyword }] },
+      { id: 'frequencyRow', title: 'Update frequency', items: [{ action: 'background.frequency', label: frequency().name }] },
+      { id: 'newPhoto', title: '', items: [{ action: 'background.newPhoto', label: 'New photo now' }], reason: photo ? 'Photo by ' + photo.user + ' on Unsplash' : '' }
     ];
+    if (t.group === 'keyword') return [{ id: 'keyword', title: '', items: options('keyword', UNSPLASH_WORDS), reason: 'Choosing a keyword fetches a new photo.' }];
+    if (t.group === 'frequency') return [{ id: 'frequency', title: '', items: options('frequency', FREQUENCIES.map(function (f) { return f.id; })), reason: 'A new photo appears the next time Home is showing once this time has passed.' }];
     if (t.group === 'layout') return [
       { id: 'layout', title: 'Layout', horizontal: true, items: options('layout', ['list', 'dock']) },
       { id: 'apps', title: 'App display', horizontal: true, items: options('apps', ['text', 'icons', 'both']) },
@@ -883,7 +914,7 @@
     ] }];
   }
   function detailRows(t) {
-    var rows = [[{ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : 'Settings' }]];
+    var rows = [[{ action: 'settings.back', label: detailParent(t) }]];
     detailSections(t).forEach(function (section) {
       var enabled = section.items.filter(function (item) { return !item.disabled; });
       if (section.horizontal && enabled.length) rows.push(enabled);
@@ -911,29 +942,55 @@
     c = next(S.c.home.slice(), S.c.recent.slice()); c.mode = value;
     if (!write(c, 'Wallpaper rotation')) S.lookError = { type: 'save', patch: { mode: value }, row: 'mode', transient: false };
   }
-  function detailBack() { cancelLook(); S.err = null; pop(); }
+  function applySource(value) {
+    var photo = S.c.photo, commit = { source: value };
+    if (value === S.c.source) return;
+    if (value === 'gallery') {
+      setLook({ wall: S.c.gallery }, { row: 'source', commit: commit, retry: function () { applySource(value); } });
+      return;
+    }
+    if (galleryWall(S.c.wall)) commit.gallery = S.c.wall;
+    if (photo && photo.keyword === S.c.keyword && !unsplashDue()) setLook({ wall: addRemoteWall(photo) }, { row: 'source', commit: commit, retry: function () { applySource(value); } });
+    else fetchUnsplash(S.c.keyword, 'source', commit);
+  }
+  function applyFrequency(value) {
+    var c;
+    S.err = null; S.lookError = null;
+    if (value === S.c.frequency) return;
+    c = next(S.c.home.slice(), S.c.recent.slice()); c.frequency = value;
+    if (!write(c, 'Update frequency')) S.lookError = { type: 'save', patch: {}, row: 'frequency', transient: false, retry: function () { applyFrequency(value); } };
+  }
+  function detailBack() { cancelUnsplash(); cancelLook(); S.err = null; pop(); }
   function detailOk(t, item) {
     var patch = {}, error = S.lookError;
     if (item.action === 'settings.back') { detailBack(); return; }
-    if (item.disabled || S.pending) return;
+    if (item.disabled || S.pending || S.unsplashBusy) return;
     if (item.action === 'settings.retry') {
       if (error && error.patch[error.row] !== undefined) detailFocus(t, choice(error.row, error.patch[error.row]), 0);
-      if (error && error.row === 'mode') applyRotation(error.patch.mode);
+      if (error && error.retry) error.retry();
+      else if (error && error.row === 'mode') applyRotation(error.patch.mode);
       else if (error) setLook(error.patch, { row: error.row });
     } else if (item.axis === 'mode') applyRotation(item.value);
+    else if (item.axis === 'source') applySource(item.value);
+    else if (item.axis === 'frequency') applyFrequency(item.value);
+    else if (item.axis === 'keyword') { if (item.value !== S.c.keyword) fetchUnsplash(item.value, 'keyword', { keyword: item.value }); }
     else if (item.axis) { patch[item.axis] = item.value; setLook(patch, { row: item.axis }); }
     else if (item.action === 'background.wallpaper') openWallpaper();
     else if (item.action === 'background.rotation') openAppearance('rotation');
+    else if (item.action === 'background.unsplash') openAppearance('unsplash');
+    else if (item.action === 'background.keyword') openAppearance('keyword');
+    else if (item.action === 'background.frequency') openAppearance('frequency');
+    else if (item.action === 'background.newPhoto') fetchUnsplash(S.c.keyword, 'source', {});
     else if (item.action === 'samsung.home') perform('Samsung Home', FrameDevice.home);
     else if (item.action === 'samsung.settings') perform('TV settings', FrameDevice.settings);
   }
   V.appearance = {
     norm: function (t) {
       var rows = detailRows(t), exists = false, applied = null;
-      var axis = { background: 'bg', layout: 'layout', typography: 'font', focus: 'focus', rotation: 'mode' }[t.group];
+      var axis = { background: 'bg', layout: 'layout', typography: 'font', focus: 'focus', rotation: 'mode', keyword: 'keyword', frequency: 'frequency' }[t.group];
       rows.forEach(function (items) { items.forEach(function (item) {
         if (item.action === t.f.action) exists = true;
-        if (item.axis === axis && item.value === S.c[axis]) applied = item;
+        if (axis && item.axis === axis && item.value === S.c[axis]) applied = item;
       }); });
       if (!exists) detailFocus(t, applied || (rows[1] || rows[0])[0], 0);
       if (t.f.column === undefined) t.f.column = detailLocation(t).column;
@@ -1033,6 +1090,7 @@
     else stage.style.removeProperty('--clock-ink');
     if (!adaptive && shown.dockClockInk) stage.style.setProperty('--dock-clock-ink', shown.dockClockInk);
     else stage.style.removeProperty('--dock-clock-ink');
+    document.getElementById('photoCredit').textContent = shown.photo ? 'Photo by ' + shown.photo.user + ' on Unsplash' : '';
     applyHomeFont();
     if (!sheet) renderHome(t);
     renderSheet(t, sheet);
@@ -1405,7 +1463,7 @@
         + ' data-z="detail" data-i="0" data-id="' + item.action + '" data-action="' + item.action + '">' + inner
         + (item.axis ? '<span class="setting-tick" aria-hidden="true">' + (applied ? icon('check') : '') + '</span>' : '') + '</button>';
     }
-    setHTML(appearanceBack, command({ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : 'Settings' }, icon('left') + '<span>' + (t.group === 'rotation' ? 'Background' : 'Settings') + '</span>', 'setting-back'));
+    setHTML(appearanceBack, command({ action: 'settings.back', label: detailParent(t) }, icon('left') + '<span>' + detailParent(t) + '</span>', 'setting-back'));
     setHTML(appearanceRows, detailSections(t).map(function (section) {
       return '<section class="setting-section' + (section.horizontal ? ' is-horizontal' : '') + ' section-' + section.id + '">'
         + (section.title ? '<h3 class="setting-label" id="setting-' + section.id + '">' + section.title + '</h3>' : '')
@@ -1414,7 +1472,7 @@
           var swatch = item.axis === 'bg', body = '';
           if (swatch || item.thumbnail) body += item.value === 'light' || item.value === 'dark'
             ? '<span class="setting-swatch swatch-' + item.value + '" aria-hidden="true"></span>'
-            : '<img class="setting-swatch" src="' + WP + S.c.wall + '-thumb.jpg" alt="">';
+            : '<img class="setting-swatch" src="' + esc(wallThumb(S.c.wall)) + '" alt="">';
           body += '<span class="setting-copy"><span class="setting-name">' + esc(item.label) + '</span>'
             + (item.description ? '<span class="setting-description">' + esc(item.description) + '</span>' : '') + '</span>';
           if (!item.axis) body += icon('right', 'setting-forward');
@@ -1422,13 +1480,14 @@
         }).join('') + '</div>'
         + (section.reason ? '<p class="setting-reason">' + esc(section.reason) + '</p>' : '') + '</section>';
     }).join(''));
-    if (S.pending) status = '<p>Loading ' + esc(S.pending.row === 'font' ? FONTS[S.pending.target.font].name : 'your choice') + '…</p><p>Back cancels this change.</p>';
+    if (S.unsplashBusy) status = '<p>Finding a photo on Unsplash…</p><p>Back cancels this change.</p>';
+    else if (S.pending) status = '<p>Loading ' + esc(S.pending.row === 'font' ? FONTS[S.pending.target.font].name : 'your choice') + '…</p><p>Back cancels this change.</p>';
     else if (error) {
-      status = '<p class="setting-error">' + (error.type === 'save' ? 'Couldn’t save this change.' : error.type === 'font' ? 'Couldn’t load ' + esc(FONTS[error.font].name) + '.' : 'Couldn’t load this appearance.') + ' Your current choice is kept.</p>'
+      status = '<p class="setting-error">' + (error.type === 'unsplash' ? UNSPLASH_ERRORS[error.reason] : error.type === 'save' ? 'Couldn’t save this change.' : error.type === 'font' ? 'Couldn’t load ' + esc(FONTS[error.font].name) + '.' : 'Couldn’t load this appearance.') + ' Your current choice is kept.</p>'
         + command({ action: 'settings.retry', label: 'Try again' }, '<span>Try again</span>', 'setting-retry');
     }
     setHTML(appearanceStatus, status);
-    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + (t.group === 'rotation' ? 'Background' : 'Settings') : selected.action === 'settings.retry' ? 'Retry this change' : selected.axis ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : 'Open on the TV';
+    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + detailParent(t) : selected.action === 'settings.retry' ? 'Retry this change' : selected.axis ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : selected.action === 'background.unsplash' ? 'Choose a keyword and update frequency' : selected.action === 'background.keyword' ? 'Choose a keyword' : selected.action === 'background.frequency' ? 'Choose how often the photo changes' : selected.action === 'background.newPhoto' ? 'Fetch a new photo' : 'Open on the TV';
     setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + esc(hint) + '</span>' : '');
   }
   function renderWallpaper(t) {
@@ -1629,9 +1688,9 @@
 
   /* ---------- Atomic appearance bundles ---------- */
   var wallToken = 0, committedBundle = null, reflowToken = 0, fontSwitchToken = 0;
-  function registeredMaterial(id) { return S.c.bg === 'photo' && S.c.material === 'soft' && !!wall(id); }
-  function matSrc(id, material) { return 'assets/materials/' + id + (material === 'soft' ? '-study-soft.jpg' : material === 'tint' ? '-field-clear.jpg' : '-field-frost.jpg'); }
-  function fieldSrc(id, material) { return 'assets/materials/' + id + (material === 'soft' ? '-field-blur.jpg' : material === 'tint' ? '-field-clear.jpg' : '-field-frost.jpg'); }
+  function registeredMaterial(id) { return S.c.bg === 'photo' && S.c.material === 'soft' && galleryWall(id); }
+  function matSrc(id, material) { return wall(id).photo ? FrameUnsplash.src(wall(id).photo, material) : 'assets/materials/' + id + (material === 'soft' ? '-study-soft.jpg' : material === 'tint' ? '-field-clear.jpg' : '-field-frost.jpg'); }
+  function fieldSrc(id, material) { return wall(id).photo ? FrameUnsplash.src(wall(id).photo, material) : 'assets/materials/' + id + (material === 'soft' ? '-field-blur.jpg' : material === 'tint' ? '-field-clear.jpg' : '-field-frost.jpg'); }
   function makeImg(cls, src) { var im = document.createElement('img'); im.className = cls; im.alt = ''; im._src = src; im.src = src; return im; }
   function whenReady(im, done) {
     var fin = false, timer = setTimeout(function () { finish(!!(im.complete && im.naturalWidth)); }, document.hidden ? 20000 : 8000);
@@ -1647,7 +1706,8 @@
   function swapImg(k, im) { var old = IMG[k]; if (old === im) return; im.style.cssText = old.style.cssText; if (old.id) im.id = old.id; old.parentNode.replaceChild(im, old); IMG[k] = im; }
   function bundleKey(look) { return look.wall + '|' + look.material; }
   function loadBundle(look, token, done) {
-    var imgs = { photo: makeImg('photo', WP + look.wall + '.jpg'), bg: makeImg('sheet-bg', WP + look.wall + '-panel.jpg') }, keys, left, allOk = true;
+    var remote = wall(look.wall).photo, keys, left, allOk = true;
+    var imgs = { photo: makeImg('photo', remote ? FrameUnsplash.src(remote, 'full') : WP + look.wall + '.jpg'), bg: makeImg('sheet-bg', remote ? FrameUnsplash.src(remote, 'panel') : WP + look.wall + '-panel.jpg') };
     imgs.mat = makeImg('mat-img', matSrc(look.wall, look.material));
     imgs.field = makeImg('ph-field-img', fieldSrc(look.wall, look.material));
     imgs.fieldAlt = makeImg('ph-field-img', fieldSrc(look.wall, look.material));
@@ -1684,14 +1744,16 @@
   function setLook(patch, options) {
     var opts = options || {}, changes = cleanPatch(patch), target = lookOf(S.c), k, token, needs, needsFont, changed, loadedBundle = null, imageDone, fontDone, failed = false;
     for (k in changes) if (changes.hasOwnProperty(k)) target[k] = changes[k];
-    changed = Object.keys(target).some(function (key) { return target[key] !== S.c[key]; });
+    changed = !!opts.commit || Object.keys(target).some(function (key) { return target[key] !== S.c[key]; });
     cancelLook(); S.err = null; token = wallToken;
     function finish(bundle) {
       var c = next(S.c.home.slice(), S.c.recent.slice()), fontChanged = target.font !== S.c.font, reflow = target.apps !== S.c.apps || target.controls !== S.c.controls || fontChanged, frame, fontFrame;
       Object.keys(target).forEach(function (key) { c[key] = target[key]; });
+      if (opts.commit) Object.keys(opts.commit).forEach(function (key) { c[key] = opts.commit[key]; });
       S.pending = null; S.wallPending = null;
-      if (!opts.transient && changed && !write(c, 'Appearance')) { S.lookError = { type: 'save', patch: changes, row: opts.row || S.appearanceFocus, transient: false }; render(); syncRotation(); return; }
+      if (!opts.transient && changed && !write(c, 'Appearance')) { S.lookError = { type: 'save', patch: changes, row: opts.row || S.appearanceFocus, transient: false, retry: opts.retry }; render(); syncRotation(); return; }
       if (opts.transient) S.c = c;
+      if (opts.commit && opts.commit.photo) FrameUnsplash.track(opts.commit.photo);
       if (reflow) { S.reflow = true; frame = ++reflowToken; }
       if (fontChanged) { S.fontSwitch = true; fontFrame = ++fontSwitchToken; }
       installBundle(bundle, target);
@@ -1711,7 +1773,10 @@
       if (token !== wallToken || failed) return;
       failed = true; S.pending = null; S.wallPending = null;
       if (type === 'load') S.wallError = target.wall;
-      S.lookError = { type: type, reason: reason || null, patch: changes, row: opts.row || (type === 'font' ? 'font' : S.appearanceFocus), transient: !!opts.transient, wall: target.wall, font: target.font };
+      // An unreachable saved photo must not leave Home without a background.
+      if (type === 'load' && opts.transient && !galleryWall(target.wall)) { setLook({ wall: S.c.gallery }, { transient: true }); return; }
+      S.lookError = opts.quiet ? null : { type: type, reason: reason || null, patch: changes, row: opts.row || (type === 'font' ? 'font' : S.appearanceFocus), transient: !!opts.transient, wall: target.wall, font: target.font, retry: opts.retry };
+      if (opts.quiet) S.wallError = null;
       if (type === 'font') log((opts.startup ? 'font fallback: ' : 'Font kept: ') + (opts.startup ? target.font : FONTS[S.c.font].name) + (opts.startup ? '' : ' (' + reason + ')'));
       if (type === 'font' && opts.startup && target.font !== 'manrope') { setLook({ font: 'manrope' }, { transient: true }); return; }
       render(); syncRotation();
@@ -1757,9 +1822,52 @@
     else setLook({}, { transient: true });
   }
 
+  /* ---------- Unsplash background ---------- */
+  var UNSPLASH_ERRORS = {
+    key: 'This build has no working Unsplash access key.', limit: 'Unsplash’s request limit has been reached. Try again later.',
+    none: 'Unsplash has no suitable photos for this keyword.', network: 'Couldn’t reach Unsplash.'
+  };
+  var unsplashRequest = 0, unsplashTimer = 0, unsplashRetryAt = 0;
+  function cancelUnsplash() { unsplashRequest++; S.unsplashBusy = false; }
+  function unsplashHome() { return !document.hidden && top().id === 'home' && S.c.bg === 'photo' && S.c.source === 'unsplash'; }
+  function unsplashDueAt() { return S.c.photo ? S.c.photo.fetchedAt + frequency().min * QA.minuteMs : 0; }
+  function unsplashDue() { var now = Date.now(); return !S.c.photo || now >= unsplashDueAt() || now < S.c.photo.fetchedAt; }
+  /* Nothing changes until the photo has loaded and saved, so a failure keeps the current background. */
+  function fetchUnsplash(keyword, row, commit, quiet) {
+    var request = ++unsplashRequest;
+    function retry() { fetchUnsplash(keyword, row, commit); }
+    S.unsplashBusy = true; S.lookError = null; S.err = null;
+    FrameUnsplash.random(keyword, S.c.photo && S.c.photo.id, function (error, photo) {
+      if (request !== unsplashRequest) return;
+      S.unsplashBusy = false;
+      if (error && !quiet) S.lookError = { type: 'unsplash', reason: error.reason, patch: {}, row: row, retry: retry };
+      if (error || quiet && !unsplashHome()) { render(); syncRotation(); return; }
+      photo.keyword = keyword; photo.fetchedAt = Date.now();
+      var full = { photo: photo };
+      Object.keys(commit).forEach(function (key) { full[key] = commit[key]; });
+      setLook({ wall: addRemoteWall(photo) }, { row: row, commit: full, quiet: quiet, retry: retry });
+    });
+    if (!quiet) render();
+  }
+  function updateUnsplash() {
+    unsplashRetryAt = Date.now() + UNSPLASH_RETRY_MIN * QA.minuteMs;
+    if (unsplashDue()) { if (FrameUnsplash.available()) fetchUnsplash(S.c.keyword, 'source', {}, true); }
+    else setLook({ wall: addRemoteWall(S.c.photo) }, { row: 'source', quiet: true });
+  }
+  function syncUnsplash() {
+    var wait;
+    clearTimeout(unsplashTimer); unsplashTimer = 0;
+    if (!unsplashHome() || S.pending || S.unsplashBusy) return;
+    // The saved wall is a gallery photo only after a saved Unsplash photo failed to load.
+    wait = galleryWall(S.c.wall) ? 0 : unsplashDue() ? 0 : unsplashDueAt() - Date.now();
+    wait = Math.max(wait, unsplashRetryAt - Date.now());
+    if (wait <= 0) updateUnsplash();
+    else unsplashTimer = setTimeout(syncUnsplash, wait);
+  }
+
   /* ---------- Lifecycle and remote input ---------- */
   var clockTimer = 0, rotationTimer = 0, activeSince = 0, activeMs = 0, rotationKey = '';
-  function rotationActive() { return !document.hidden && top().id === 'home' && S.c.bg === 'photo' && !S.pending && mode().min > 0; }
+  function rotationActive() { return !document.hidden && top().id === 'home' && S.c.bg === 'photo' && S.c.source === 'gallery' && !S.pending && mode().min > 0; }
   function pauseRotation() {
     if (activeSince) { activeMs += Date.now() - activeSince; activeSince = 0; }
     clearTimeout(rotationTimer); rotationTimer = 0;
@@ -1767,7 +1875,7 @@
   function resetRotation() { pauseRotation(); activeMs = 0; rotationKey = ''; }
   function syncRotation() {
     var key = S.c.wall + '|' + S.c.mode;
-    pauseRotation();
+    pauseRotation(); syncUnsplash();
     if (key !== rotationKey) { activeMs = 0; rotationKey = key; }
     if (!rotationActive()) return;
     activeSince = Date.now();
@@ -1786,7 +1894,7 @@
   function after() { norm(); render(); syncRotation(); }
   function goScene(name) {
     if (top().id === 'wallpaper') cancelWallpaperTimer(top());
-    S.stack = [S.stack[0]]; S.stack[0].f.zone = 'apps'; clearSession(); restoreLook();
+    cancelUnsplash(); S.stack = [S.stack[0]]; S.stack[0].f.zone = 'apps'; clearSession(); restoreLook();
     if (name === 'apps') openApps();
     else if (name === 'settings') openSettings();
     else if (name === 'appearance') { openSettings(); top().f.id = 'background'; S.settingsFocus = 'background'; openAppearance('background'); }

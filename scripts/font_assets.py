@@ -66,10 +66,29 @@ def font_overlay(root=ROOT, include_private=True):
     return assets
 
 
+def unsplash_overlay(root=ROOT, include_private=True):
+    """Inject a personal Unsplash key and keywords; public builds keep the keyless default."""
+    source = root / '.local/unsplash.json'
+    if not include_private or not source.is_file():
+        return {}
+    try:
+        settings = json.loads(source.read_text())
+    except ValueError:
+        raise ValueError('.local/unsplash.json is not valid JSON.') from None
+    key, keywords = settings.get('access_key'), settings.get('keywords')
+    if not isinstance(key, str) or not re.fullmatch(r'[A-Za-z0-9_-]{20,128}', key):
+        raise ValueError('.local/unsplash.json needs a valid access_key; see unsplash.example.json.')
+    if (not isinstance(keywords, list) or not 1 <= len(keywords) <= 8
+            or not all(isinstance(word, str) and 0 < len(word.strip()) <= 40 for word in keywords)):
+        raise ValueError('.local/unsplash.json needs one to eight keywords of at most 40 characters.')
+    config = {'accessKey': key, 'keywords': [word.strip() for word in keywords]}
+    return {'assets/unsplash-config.js': ('window.CleanFrameUnsplash = ' + json.dumps(config) + ';\n').encode()}
+
+
 def write_widget_archive(output, root=ROOT, include_private=True, identity=None):
     """Create an unsigned archive without reading signing or device settings."""
     app = root / 'app'
-    overlay = font_overlay(root, include_private)
+    overlay = {**font_overlay(root, include_private), **unsplash_overlay(root, include_private)}
     if identity is not None:
         overlay['config.xml'] = override_identity((app / 'config.xml').read_bytes(), identity)
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED, allowZip64=False) as package:

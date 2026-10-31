@@ -37,6 +37,17 @@ class ToolTests(unittest.TestCase):
         path.chmod(mode)
         return path
 
+    def test_unsplash_key_stays_out_of_public_builds(self):
+        (self.root / '.local').mkdir(exist_ok=True)
+        (self.root / '.local/unsplash.json').write_text(json.dumps({'access_key': 'k' * 40, 'keywords': ['Spring']}))
+        private, public = self.root / 'private.wgt', self.root / 'public.wgt'
+        write_widget_archive(private, root=self.root)
+        write_widget_archive(public, root=self.root, include_private=False)
+        with zipfile.ZipFile(private) as archive:
+            self.assertIn('k' * 40, archive.read('assets/unsplash-config.js').decode())
+        with zipfile.ZipFile(public) as archive:
+            self.assertNotIn(b'k' * 40, b''.join(archive.read(name) for name in archive.namelist()))
+
     def test_existing_identity_and_sdk_defaults(self):
         settings = load_settings(self.root)
         self.assertEqual(settings['profile'], 'FrameHome')

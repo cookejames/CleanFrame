@@ -36,6 +36,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 
 /* Caption: the clock, or the name of the mode Home is in */
 .caption{position:absolute;left:140px;top:72px;display:flex;flex-direction:column;max-width:1040px}
+.photo-credit{position:absolute;left:980px;top:1040px;width:800px;font-size:10px;line-height:16px;font-weight:500;text-align:right;color:#d6d6d6;text-shadow:0 1px 3px rgba(14,10,6,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.photo-credit:empty,.bg-dark .photo-credit,.bg-light .photo-credit{display:none}
 .clock,.cap-title{font-size:48px;line-height:64px;font-weight:500;letter-spacing:-1.5px;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.22)}
 .clock{font-variant-numeric:tabular-nums}
 .cap-line{max-width:100%;font-size:30px;line-height:40px;font-weight:500;letter-spacing:-.2px;color:rgba(255,255,255,.88);text-shadow:0 1px 2px rgba(0,0,0,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -508,8 +510,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .section-material .setting-choice:last-child{flex:1.4}
 .detail-background .section-rotation .setting-choice{padding-left:128px}
 .detail-layout .setting-section+.setting-section,.detail-focus .setting-section+.setting-section{margin-top:64px}
-.detail-typography .setting-choice,.detail-rotation .setting-choice{min-height:88px}
-.detail-typography .appearance-rows,.detail-rotation .appearance-rows,.detail-samsung .appearance-rows{top:260px}
+.detail-typography .setting-choice,.detail-rotation .setting-choice,.detail-keyword .setting-choice,.detail-frequency .setting-choice{min-height:88px}
+.detail-typography .appearance-rows,.detail-rotation .appearance-rows,.detail-keyword .appearance-rows,.detail-frequency .appearance-rows,.detail-samsung .appearance-rows{top:260px}
 .setting-choice.has-description{min-height:120px}
 .setting-description{font-size:26px;line-height:36px;font-weight:400;letter-spacing:0;color:var(--mute);white-space:normal}
 .setting-choice.is-focus .setting-description{color:var(--solid-mute)}

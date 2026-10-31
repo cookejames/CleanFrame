@@ -45,6 +45,10 @@ With no `.local/signing.json`, the original maintainer defaults remain: `.local/
 
 The initial custom XML-signature implementation was rejected by the TV. Use the official SDK packager for future builds; the installed test was signed with Tizen CLI 2.5.25.
 
+## Unsplash access key
+
+The Unsplash image source needs an access key from an app registered at [Unsplash Developers](https://unsplash.com/developers). Copy `unsplash.example.json` to `.local/unsplash.json` and set `access_key` and one to eight `keywords`. Preview and `npm run package` inject these into `assets/unsplash-config.js`, and the installed widget contains the key. Never publish that build. Public-font preview and `npm run export:public` keep the keyless tracked default, where choosing Unsplash reports that the build has no key. A new Unsplash app starts in demo mode, limited to 50 API requests an hour; each automatic update uses one request and one download report.
+
 ## Another checkout or Mac
 
 Install the official [Samsung TV SDK](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/installing-tv-sdk.html) and select its path in `.local/signing.json`. The signing runner uses POSIX terminal/process APIs and is supported by these tools on macOS/Linux; Windows needs its own adapted runner. To retain in-place updates to your own existing app, securely transfer its author certificate and password. Keep those credentials local.

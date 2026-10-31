@@ -4,7 +4,7 @@ import io
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-from font_assets import font_overlay
+from font_assets import font_overlay, unsplash_overlay
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,8 +16,9 @@ class PreviewServer(ThreadingHTTPServer):
 class Preview(SimpleHTTPRequestHandler):
     def send_head(self):
         route = unquote(urlsplit(self.path).path)
-        if route in ['/home/assets/font-catalog.js', '/home/assets/private-fonts.css'] or route.startswith('/home/assets/private-fonts/'):
-            source = font_overlay(include_private=self.server.include_private_fonts).get(route[len('/home/'):])
+        unsplash = unsplash_overlay(include_private=self.server.include_private_fonts) if route == '/home/assets/unsplash-config.js' else {}
+        if unsplash or route in ['/home/assets/font-catalog.js', '/home/assets/private-fonts.css'] or route.startswith('/home/assets/private-fonts/'):
+            source = {**font_overlay(include_private=self.server.include_private_fonts), **unsplash}.get(route[len('/home/'):])
             if source is None:
                 self.send_error(404, 'File not found')
                 return None

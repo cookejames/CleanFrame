@@ -19,6 +19,7 @@ for tag in ['content', 'icon']:
 assert all((app / name).is_file() for name in ['main.js', 'style.css'])
 for reference in ['assets/wallpapers/catalog.js', 'assets/adaptive-ink.js', 'assets/font-catalog.js']:
     assert (app / reference).is_file(), 'Missing runtime catalogue: ' + reference
+assert '"accessKey": ""' in (app / 'assets/unsplash-config.js').read_text(), 'Keep the Unsplash key in .local/unsplash.json'
 for filename in ['index.html']:
     source = (app / filename).read_text()
     pattern = r'(?:src|href)=[\"\']([^\"\']+)' if filename.endswith('.html') else r'from\s+[\"\']([^\"\']+)'

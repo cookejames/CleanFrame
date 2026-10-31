@@ -16,7 +16,7 @@ Settings opens a grouped overview: Background, Layout, Typography, Focus, Apps o
 
 | Group | Choices |
 | --- | --- |
-| Background | Photo, Light, Dark; Wallpaper and Rotation when Photo is active |
+| Background | Photo, Light, Dark; Image source (Built-in or Unsplash) when Photo is active; Wallpaper and Rotation for Built-in; Keyword, Update frequency and New photo now for Unsplash |
 | Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls |
 | Typography | Manrope, Neue Montreal, Mori, Pangram Sans, Geist and Newsreader, when available |
 | Focus | Type or Glass; Soft, Frost or Clear tint material |
@@ -72,7 +72,11 @@ The gallery contains 15 bundled wallpapers. Settings → Background → Wallpape
 
 Settings → Background → Rotation offers Fixed, Each time Home opens, Every 5 minutes, Every 15 minutes and Every hour. Each time Home opens advances once when the launcher loads; a return to the already-running launcher does not advance it. Timed rotation counts only visible Photo Home time in either List or Dock. Panels, flat backgrounds and time spent in other apps pause the cycle. Changing the photo or rotation mode starts a new interval.
 
-Launcher wallpaper is separate from native Art Mode. Runtime photos, materials and available fonts are local assets; they do not require the Mac or a network download.
+Settings → Background → Image source switches between the built-in gallery and Unsplash. Unsplash needs an access key in the build; see [development](development.md). Its screen offers one keyword from the configured list, an update frequency of every hour, day or week, and New photo now. Choosing Unsplash, a different keyword or New photo now requests photos first and changes nothing until the chosen photo has loaded and saved. A failure keeps the current background, with a Try again action. Back cancels. Returning to Built-in restores the earlier gallery photo.
+
+A photo is chosen at random from up to ten landscape results, preferring sources at least 3840px wide and accepting 2560px, with an aspect ratio between 1.4 and 2. It is served as a centred 16:9 crop, at the TV's reported width up to 3840px. Updates are checked while Photo Home is showing, against the time the current photo was fetched, so an overdue photo changes the next time Home is visible. A failed automatic update stays silent, keeps the photo and waits 15 minutes. If a saved photo cannot load at startup, Home shows the built-in gallery photo until it can reach Unsplash. Rotation does not apply to Unsplash. Home shows the photographer credit that Unsplash requires.
+
+Launcher wallpaper is separate from native Art Mode. Built-in photos, materials and available fonts are local assets; they do not require the Mac or a network download. Unsplash photos need the internet.
 
 ## Sources
 
@@ -85,6 +89,6 @@ The native Home operation and startup configuration from 19 October remain separ
 
 Both layouts show the TV's local time in 12-hour format, without AM/PM or seconds. It updates at the minute boundary and on return to the launcher. No date or clock panel is shown.
 
-Photographic materials and blurred panel backgrounds are generated before packaging and stay aligned with the full-screen image. Photo colour and contrast metadata are also prepared offline. Navigation does not sample image pixels, run an optics engine or apply live backdrop blur. Flat backgrounds use matching light or dark panel colours. Focus feedback uses transforms and opacity; reduced motion removes animated scaling and movement while retaining opacity feedback.
+Photographic materials and blurred panel backgrounds are generated before packaging and stay aligned with the full-screen image. Photo colour and contrast metadata are also prepared offline. Unsplash materials use blurred copies served by Unsplash's image service, and those photos always use the dimmed, light-ink treatment because they have no offline review. Navigation does not sample image pixels, run an optics engine or apply live backdrop blur. Flat backgrounds use matching light or dark panel colours. Focus feedback uses transforms and opacity; reduced motion removes animated scaling and movement while retaining opacity feedback.
 
 Hidden prelaunch can install a fully loaded wallpaper bundle without waiting for an animation frame. A valid loaded image remains usable if detached-image decoding rejects. A failed startup bundle retries when the launcher becomes visible; an active wallpaper preview keeps its candidate. Font recovery clears fallback measurements and cached markup. This readiness fallback uses a completed load and nonzero image dimensions; it does not prove a TV has painted the image, and an accepted bundle is not automatically decoded again on return. These paths have browser regression coverage; physical cold-boot behaviour still needs owner observation.
