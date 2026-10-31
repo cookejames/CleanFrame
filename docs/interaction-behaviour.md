@@ -3,6 +3,7 @@
 ## Home
 
 - Dock: Left/Right scrolls the apps without wrapping. Up enters the top-right controls, starting with Art Mode or the last selected control. Left/Right moves between Art Mode, All apps and Settings. Down or Back returns to the selected app. The clock is at the top left.
+- Dock position and size: Low puts the Dock's lower edge level with the photo credit, and the credit is hidden from Home in this position. Settings → Background always shows the credit while Unsplash is chosen. Middle centres the Dock vertically. Compact draws the Dock at 80%. In Icons display, Low shows the focused app's name above the Dock. The Home editor and empty Home keep the default position and size because their controls sit beneath the Dock.
 - List: Up/Down scrolls the apps without wrapping. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between Art Mode, All apps and Settings. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
 - OK opens the selected item. Focus alone never launches an app.
 - Icons-only apps and controls reveal their names when focused. App presentation and control presentation are independent.
@@ -17,7 +18,7 @@ Settings opens a grouped overview: Background, Layout, Typography, Focus, Apps o
 | Group | Choices |
 | --- | --- |
 | Background | Photo, Light, Dark; Image source (Built-in or Unsplash) when Photo is active; Wallpaper and Rotation for Built-in; Keyword, Update frequency and New photo now for Unsplash |
-| Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls |
+| Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls; 24-hour or 12-hour clock; a Dock page with Position (Default, Low or Middle) and Size (Default or Compact) |
 | Typography | Manrope, Neue Montreal, Mori, Pangram Sans, Geist and Newsreader, when available |
 | Focus | Type or Glass; Soft, Frost or Clear tint material |
 | Apps on Home | Membership and arrangement editor |
@@ -87,7 +88,7 @@ The native Home operation and startup configuration from 19 October remain separ
 
 ## Clock and rendering
 
-Both layouts show the TV's local time in 12-hour format, without AM/PM or seconds. It updates at the minute boundary and on return to the launcher. No date or clock panel is shown.
+Both layouts show the TV's local time in the format chosen under Layout: 24-hour by default, or 12-hour without AM/PM. Neither shows seconds. It updates at the minute boundary and on return to the launcher. No date or clock panel is shown.
 
 Photographic materials and blurred panel backgrounds are generated before packaging and stay aligned with the full-screen image. Photo colour and contrast metadata are also prepared offline. Unsplash materials use blurred copies served by Unsplash's image service, and those photos always use the dimmed, light-ink treatment because they have no offline review. Navigation does not sample image pixels, run an optics engine or apply live backdrop blur. Flat backgrounds use matching light or dark panel colours. Focus feedback uses transforms and opacity; reduced motion removes animated scaling and movement while retaining opacity feedback.
 

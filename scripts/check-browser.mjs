@@ -1012,7 +1012,40 @@ try {
     const focus = (await state()).focusAction; await current.keyboard.press('ArrowDown');
     check('Warm return restores remote focus', (await state()).focusAction !== focus && (await call('where')).focusCount === 1);
     const clock = await current.locator('#caption .clock').textContent();
-    check('Live 12-hour clock has no AM/PM', /^\s*\d{1,2}:\d{2}\s*$/.test(clock), clock);
+    check('Live 24-hour clock is the default', /^\s*\d{2}:\d{2}\s*$/.test(clock) && (await state()).committed.clock === '24', clock);
+    await call('look', { clock: '12' }); await ready();
+    const twelve = await current.locator('#caption .clock').textContent();
+    check('12-hour clock has no leading zero or AM/PM', /^\s*\d{1,2}:\d{2}\s*$/.test(twelve) && !/^\s*0/.test(twelve) && (await stored()).look.clock === '12', twelve);
+  });
+  await run('Dock position and size', async () => {
+    const box = () => current.evaluate(() => {
+      const d = document.getElementById('dock').getBoundingClientRect(), t = document.querySelector('#track .tile').getBoundingClientRect();
+      return { top: d.top, bottom: d.bottom, width: d.width, height: d.height, tile: t.width };
+    });
+    await page({ seed: baseline({ dock: PRIMARY.slice(0, 5) }) });
+    await look({ layout: 'dock', bg: 'photo', apps: 'both' });
+    const standard = await box();
+    check('Dock defaults keep the existing frame', standard.bottom === 908 && (await state()).committed.dockPosition === 'default' && (await state()).committed.dockSize === 'default', standard);
+    await look({ dockPosition: 'low' });
+    check('Low Dock ends level with the credit baseline box', (await box()).bottom === 1056, await box());
+    await look({ dockSize: 'compact' });
+    const compact = await box();
+    check('Compact Dock is 80% of the default', Math.abs(compact.height - standard.height * .8) <= 1 && Math.abs(compact.width - standard.width * .8) <= 1 && Math.abs(compact.tile - standard.tile * .8) <= 1 && compact.bottom === 1056, compact);
+    await look({ dockPosition: 'middle' });
+    const middle = await box();
+    check('Middle Dock is vertically centred', Math.abs(middle.top + middle.bottom - 1080) <= 1, middle);
+    check('Dock choices are saved', (await stored()).look.dockPosition === 'middle' && (await stored()).look.dockSize === 'compact');
+    await look({ dockPosition: 'default', dockSize: 'default', layout: 'list' }); await group('layout');
+    check('Dock page is unavailable in the List layout', !(await current.locator('[data-action="dock.options"]').evaluate(e => e.getAttribute('aria-disabled') === 'false')));
+    await look({ layout: 'dock' }); await group('layout');
+    const clear = await current.evaluate(() => { const rows = document.querySelector('.appearance-rows').getBoundingClientRect(), hints = [...document.querySelectorAll('.at-appearance *')].filter(e => e.children.length === 0 && /^Apply selected setting|^Open /.test(e.textContent) && e.getClientRects().length).map(e => e.getBoundingClientRect().top); return hints.every(top => rows.bottom <= top) && rows.bottom <= document.getElementById('stage').getBoundingClientRect().bottom; });
+    check('Layout page rows clear the OK hint', clear);
+    await act('dock.options');
+    await current.waitForFunction(() => document.querySelector('[data-action="choice.dockPosition.low"]'));
+    await act('choice.dockPosition.low'); await ready();
+    check('Dock page applies a position', (await state()).committed.dockPosition === 'low');
+    const overflow = await current.locator('.appearance-rows').evaluate(e => e.getBoundingClientRect().bottom / document.getElementById('stage').getBoundingClientRect().height);
+    check('Dock page fits the screen', overflow <= 1, overflow);
   });
   await run('Open rotation and browser fallback', async () => {
     await page({ seed: baseline({ mode: 'open' }) }); check('Open mode advances at cold start', (await state()).wallpaper === walls[1].id);

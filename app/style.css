@@ -93,7 +93,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .tone-light.m-tint .mat-veil{background:rgba(8,14,18,.38)}
 /* One edge: a top hairline that follows the radius. No lower highlight, no outer shadow. */
 .mat::after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;border-radius:48px;box-shadow:inset 0 1px 0 rgba(255,255,255,.24);pointer-events:none}
-.shelf{position:absolute;left:16px;top:0;bottom:0;width:1472px;overflow:hidden}
+.shelf{position:absolute;left:16px;top:0;bottom:0;width:1472px;overflow:hidden;transform-origin:0 0}
+.dock.is-compact .mat,.dock.is-compact .mat::after{border-radius:38px}
 .shelf.fade-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 132px),rgba(0,0,0,.2));mask-image:linear-gradient(to right,#000 calc(100% - 132px),rgba(0,0,0,.2))}
 .shelf.fade-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 132px),rgba(0,0,0,.2));mask-image:linear-gradient(to left,#000 calc(100% - 132px),rgba(0,0,0,.2))}
 .shelf.fade-l.fade-r{-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,.2),#000 132px,#000 calc(100% - 132px),rgba(0,0,0,.2));mask-image:linear-gradient(to right,rgba(0,0,0,.2),#000 132px,#000 calc(100% - 132px),rgba(0,0,0,.2))}
@@ -509,7 +510,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .is-horizontal .setting-tick .ico{width:26px;height:26px}
 .section-material .setting-choice:last-child{flex:1.4}
 .detail-background .section-rotation .setting-choice{padding-left:128px}
-.detail-layout .setting-section+.setting-section,.detail-focus .setting-section+.setting-section{margin-top:64px}
+.detail-layout .setting-section+.setting-section{margin-top:16px}
+.detail-layout .setting-choice,.detail-layout .is-horizontal .setting-choice{min-height:72px}
+.detail-focus .setting-section+.setting-section,.detail-dock .setting-section+.setting-section{margin-top:64px}
 .detail-typography .setting-choice,.detail-rotation .setting-choice,.detail-keyword .setting-choice,.detail-frequency .setting-choice{min-height:88px}
 .detail-typography .appearance-rows,.detail-rotation .appearance-rows,.detail-keyword .appearance-rows,.detail-frequency .appearance-rows,.detail-samsung .appearance-rows{top:260px}
 .setting-choice.has-description{min-height:120px}
