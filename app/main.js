@@ -41,7 +41,7 @@
     { id: '60', name: 'Every hour', min: 60 }
   ];
   var UNSPLASH_WORDS = (window.CleanFrameUnsplash || {}).keywords || ['Spring'], REMOTE = 'unsplash:', UNSPLASH_RETRY_MIN = 15, remoteWalls = {};
-  var FREQUENCIES = [{ id: 'hourly', name: 'Every hour', min: 60 }, { id: 'daily', name: 'Every day', min: 1440 }, { id: 'weekly', name: 'Every week', min: 10080 }];
+  var FREQUENCIES = [{ id: 'hourly', name: 'Every hour', min: 60 }, { id: '12h', name: 'Every 12 hours', min: 720 }, { id: 'daily', name: 'Every day', min: 1440 }, { id: 'weekly', name: 'Every week', min: 10080 }];
   var KEY = 'cleanframe.home.v1', storageOk = true, catalog = { loading: false, loaded: false, error: null, request: 0, revision: 0 };
   var QA = window.ShoreQA = { minuteMs: window.ShoreQA && window.ShoreQA.minuteMs || 60000 };
   var FONTS = {
@@ -112,7 +112,7 @@
   }
   function galleryWall(id) { var w = wall(id); return !!w && !w.photo; }
   function wallThumb(id) { var w = wall(id); return w && w.photo ? FrameUnsplash.src(w.photo, 'thumb') : WP + id + '-thumb.jpg'; }
-  function frequency() { for (var i = 0; i < FREQUENCIES.length; i++) if (FREQUENCIES[i].id === S.c.frequency) return FREQUENCIES[i]; return FREQUENCIES[1]; }
+  function frequency() { for (var i = 0; i < FREQUENCIES.length; i++) if (FREQUENCIES[i].id === S.c.frequency) return FREQUENCIES[i]; return FREQUENCIES[2]; }
   function wallIndex(id) { for (var i = 0; i < WALLS.length; i++) if (WALLS[i].id === id) return i; return 0; }
   function frostClass(w) { var i = [.12, .20, .30, .36, .44].indexOf(w.frostVeil); return i > 0 ? ' fv-' + (i + 1) : ''; }
   function wallClasses(w) { return frostClass(w) + (w.listColumn ? ' lc-' + w.listColumn : '') + (w.dockQuiet ? ' db-quiet' : '') + (w.clockMist ? ' tl-mist' : ''); }

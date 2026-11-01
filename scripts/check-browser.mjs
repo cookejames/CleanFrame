@@ -1084,7 +1084,9 @@ try {
     check('Materials are served blurred, with no live blur', api.images.some(u => u.includes('blur=')) && api.images.some(u => /w=1920|w=3840/.test(u) && !u.includes('blur=')), api.images);
     check('The photo use is reported to Unsplash', same(api.tracked, ['/photos/wide/download']), api.tracked);
     check('Photographer credit is plain text', (await current.locator('#photoCredit').textContent()) === 'Photo by Ann <b>Example</b> on Unsplash');
-    await act('background.unsplash'); await act('background.frequency'); await act('choice.frequency.weekly');
+    await act('background.unsplash'); await act('background.frequency'); await act('choice.frequency.12h');
+    check('The 12-hour frequency is saved', (await state()).frequency === '12h');
+    await nav('back'); check('The Unsplash screen names the 12-hour frequency', (await current.locator('#stage').innerText()).includes('Every 12 hours')); await act('background.frequency'); await act('choice.frequency.weekly');
     check('Frequency is saved', (await state()).frequency === 'weekly');
     await nav('back'); await act('background.keyword');
     api.items = [photo('highland')];
