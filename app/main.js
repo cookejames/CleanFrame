@@ -56,11 +56,12 @@
   var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], clock: ['24', '12'], dockPosition: ['default', 'low', 'middle'], dockSize: ['default', 'compact'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] };
   var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', clock: 'Clock', dockPosition: 'Dock position', dockSize: 'Dock size', focus: 'Focus', material: 'Material' };
   var VALUE_NAMES = { '24': '24-hour', '12': '12-hour', 'default': 'Default', low: 'Low', middle: 'Middle', compact: 'Compact', gallery: 'Built-in', unsplash: 'Unsplash', dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
-  var UTIL = { art: ['Art Mode', 'art'], apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
+  var UTIL = { next: ['Next background', 'next'], art: ['Art Mode', 'art'], apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
   var MSG = {
     leave: { title: 'Leave Home?', line: 'Open Samsung Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'Samsung Home']] }
   };
   var SVG = {
+    next: '<path d="M6 5.5 16 12 6 18.5Z"/><path d="M18.5 5.5v13"/>',
     art: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 3 3 2.5-2.5 5 5"/>',
     apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
     arrange: '<path d="M4 8.5h14M15 5.5l3 3-3 3M20 15.5H6M9 12.5l-3 3 3 3"/>',
@@ -520,14 +521,15 @@
   }
 
   /* ---------- Navigation targets ---------- */
-  function utils() { return ['art', 'apps', 'settings']; }
+  function utils() { return S.c.bg === 'photo' && S.c.source === 'unsplash' && FrameUnsplash.available() ? ['next', 'art', 'apps', 'settings'] : ['art', 'apps', 'settings']; }
   /* prev/next run along the apps; out goes to the controls, inn comes back (or to a per-app action). */
   function axes() {
     var v = S.c.layout === 'list';
     return { prev: v ? 'up' : 'left', next: v ? 'down' : 'right', out: v ? 'right' : 'up', inn: v ? 'left' : 'down' };
   }
   function utilAction(u) {
-    if (u === 'art') perform('Art Mode', FrameDevice.art);
+    if (u === 'next') { if (!S.unsplashBusy && !S.pending) fetchUnsplash(S.c.keyword, 'source', {}); }
+    else if (u === 'art') perform('Art Mode', FrameDevice.art);
     else if (u === 'apps') openApps();
     else openSettings();
   }
@@ -561,8 +563,17 @@
 
   /* ---------- Home (browse) ---------- */
   V.home = {
+    // The next button leads the row, so the same control keeps focus when it appears or goes.
+    norm: function (t) {
+      var count = utils().length, shift = S.utilCount ? count - S.utilCount : 0;
+      S.utilCount = count;
+      if (!shift) return;
+      S.lastUtil = clamp(S.lastUtil + shift, 0, count - 1);
+      t.f.u = clamp((t.f.u || 0) + shift, 0, count - 1);
+    },
     key: function (t, k) {
       var f = t.f, h = S.c.home, U = utils(), x = axes(), i = ensureSel();
+      S.lookError = null;
       if (S.c.layout === 'list') { listHomeKey(t, k, i, U); return; }
       if (f.zone === 'util') {
         f.u = clamp(f.u, 0, U.length - 1);
@@ -1163,10 +1174,14 @@
     renderUtilFocusLabel(iconsOnly ? focused : null);
     renderUtilityLens(focused, iconsOnly);
   }
+  function nextStatus(button) {
+    if (button.getAttribute('data-action') !== 'util.next') return '';
+    return S.unsplashBusy || S.pending ? 'Finding a photo…' : S.lookError ? 'Couldn’t get a photo. OK tries again.' : '';
+  }
   function renderUtilFocusLabel(button) {
     var text, key, r, sr, scale, width, x;
     if (!button) { utilFocusLabel.className = 'util-focus-label'; utilFocusKey = ''; return; }
-    text = S.err ? 'Not saved. OK tries again.' : button.getAttribute('aria-label');
+    text = S.err ? 'Not saved. OK tries again.' : nextStatus(button) || button.getAttribute('aria-label');
     key = button.getAttribute('data-action') + '|' + text + '|' + homeFont();
     if (key !== utilFocusKey) {
       utilFocusLabel.className = 'util-focus-label'; utilFocusLabel.textContent = text;
@@ -1552,6 +1567,7 @@
     var root = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl, active = root.querySelectorAll('.is-focus[data-action]'), target = null, text = S.err ? 'Not saved. OK tries again.' : '', i, r, sr, scale, x, y, w, action, solid, photoRow = false, photoFree = false;
     Array.prototype.forEach.call(stage.querySelectorAll('.has-local-status'), function (el) { el.className = el.className.replace(/\s+has-local-status/g, ''); });
     for (i = 0; i < active.length; i++) if (renderedAction(active[i])) { target = active[i]; break; }
+    if (!text && target && target.parentNode === utilsEl) text = nextStatus(target);
     if (!text && t.id === 'arrange' && (t.f.zone === 'act' || t.f.zone === 'tiles')) {
       var slot = t.slots[t.f.i];
       if (slot && !slot.removed && t.f.zone === 'act' && S.c.home.length === 1) text = LAST;
