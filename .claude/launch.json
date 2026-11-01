@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cleanframe-public",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["scripts/preview.py", "--public-fonts"],
+      "port": 4795
+    }
+  ]
+}
